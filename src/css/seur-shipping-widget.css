@@ -1,0 +1,555 @@
+/* ==============================================================================
+   WIDGET FLOTANTE DE ENVÍO SEUR - SQUARESPACE INTEGRATION
+   ============================================================================== */
+
+/* Variables CSS para personalización */
+:root {
+  --seur-primary-color: #0066cc;
+  --seur-secondary-color: #004499;
+  --seur-success-color: #28a745;
+  --seur-warning-color: #ffc107;
+  --seur-danger-color: #dc3545;
+  --seur-light-color: #f8f9fa;
+  --seur-dark-color: #343a40;
+  --seur-border-radius: 12px;
+  --seur-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --seur-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Widget flotante principal */
+.seur-shipping-widget {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  max-width: calc(100vw - 40px);
+  background: white;
+  border-radius: var(--seur-border-radius);
+  box-shadow: var(--seur-shadow);
+  z-index: 9999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  transition: var(--seur-transition);
+  transform: translateY(0);
+}
+
+.seur-shipping-widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Header del widget */
+.seur-widget-header {
+  background: linear-gradient(135deg, var(--seur-primary-color), var(--seur-secondary-color));
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.seur-widget-header:hover {
+  background: linear-gradient(135deg, var(--seur-secondary-color), var(--seur-primary-color));
+}
+
+.seur-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.seur-widget-icon {
+  font-size: 18px;
+  animation: seur-bounce 2s infinite;
+}
+
+@keyframes seur-bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-3px); }
+  60% { transform: translateY(-2px); }
+}
+
+.seur-widget-toggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--seur-transition);
+  font-size: 12px;
+}
+
+.seur-widget-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(180deg);
+}
+
+/* Contenido del widget */
+.seur-widget-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.seur-widget-content.expanded {
+  max-height: 500px;
+}
+
+.seur-widget-body {
+  padding: 20px;
+}
+
+/* Estados del widget */
+.seur-widget-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--seur-dark-color);
+}
+
+.seur-widget-loading .seur-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--seur-light-color);
+  border-top: 2px solid var(--seur-primary-color);
+  border-radius: 50%;
+  animation: seur-spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes seur-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.seur-widget-loading .seur-loading-text {
+  font-size: 13px;
+  color: var(--seur-dark-color);
+}
+
+/* Información de envío */
+.seur-shipping-info {
+  margin-bottom: 16px;
+}
+
+.seur-shipping-cost {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--seur-light-color);
+  border-radius: 8px;
+  border-left: 4px solid var(--seur-primary-color);
+}
+
+.seur-shipping-cost.free {
+  border-left-color: var(--seur-success-color);
+  background: #d4edda;
+}
+
+.seur-cost-label {
+  font-size: 13px;
+  color: var(--seur-dark-color);
+  font-weight: 500;
+}
+
+.seur-cost-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--seur-primary-color);
+}
+
+.seur-cost-value.free {
+  color: var(--seur-success-color);
+}
+
+.seur-cost-value.paid {
+  color: var(--seur-danger-color);
+}
+
+/* Mensaje de envío gratuito */
+.seur-free-shipping-message {
+  background: linear-gradient(135deg, var(--seur-success-color), #20c997);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  animation: seur-pulse 2s infinite;
+}
+
+@keyframes seur-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+.seur-free-shipping-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+/* Mensaje motivacional para envío gratuito */
+.seur-motivational-message {
+  background: var(--seur-warning-color);
+  color: var(--seur-dark-color);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 12px;
+  border-left: 3px solid #e0a800;
+}
+
+.seur-remaining-amount {
+  font-weight: 700;
+  color: var(--seur-primary-color);
+}
+
+/* Detalles del envío */
+.seur-shipping-details {
+  background: var(--seur-light-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.seur-detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.seur-detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.seur-detail-label {
+  color: var(--seur-dark-color);
+  font-weight: 500;
+}
+
+.seur-detail-value {
+  color: var(--seur-primary-color);
+  font-weight: 600;
+}
+
+/* Productos en el carrito */
+.seur-cart-items {
+  margin-bottom: 16px;
+}
+
+.seur-cart-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.seur-cart-item:last-child {
+  border-bottom: none;
+}
+
+.seur-item-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--seur-primary-color);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.seur-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.seur-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--seur-dark-color);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seur-item-info {
+  font-size: 11px;
+  color: #6c757d;
+  display: flex;
+  gap: 8px;
+}
+
+.seur-item-quantity {
+  background: var(--seur-primary-color);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Estados de error */
+.seur-widget-error {
+  background: var(--seur-danger-color);
+  color: white;
+  padding: 16px;
+  text-align: center;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.seur-error-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.seur-error-message {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Botón de recálculo */
+.seur-recalculate-btn {
+  width: 100%;
+  background: var(--seur-primary-color);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--seur-transition);
+  margin-top: 8px;
+}
+
+.seur-recalculate-btn:hover {
+  background: var(--seur-secondary-color);
+  transform: translateY(-1px);
+}
+
+.seur-recalculate-btn:active {
+  transform: translateY(0);
+}
+
+/* Footer del widget */
+.seur-widget-footer {
+  background: var(--seur-light-color);
+  padding: 12px 20px;
+  text-align: center;
+  border-top: 1px solid #e9ecef;
+}
+
+.seur-footer-text {
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.seur-footer-logo {
+  color: var(--seur-primary-color);
+  font-weight: 600;
+}
+
+/* Estados minimizados */
+.seur-widget.minimized .seur-widget-content {
+  max-height: 0;
+}
+
+.seur-widget.minimized .seur-widget-toggle {
+  transform: rotate(0deg);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .seur-shipping-widget {
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
+  
+  .seur-widget-header {
+    padding: 14px 16px;
+  }
+  
+  .seur-widget-body {
+    padding: 16px;
+  }
+  
+  .seur-widget-footer {
+    padding: 10px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .seur-shipping-widget {
+    bottom: 5px;
+    right: 5px;
+    left: 5px;
+  }
+  
+  .seur-widget-header {
+    padding: 12px 14px;
+  }
+  
+  .seur-widget-title {
+    font-size: 13px;
+  }
+  
+  .seur-widget-body {
+    padding: 14px;
+  }
+}
+
+/* Animaciones de entrada */
+.seur-widget-enter {
+  animation: seur-slideIn 0.3s ease-out;
+}
+
+@keyframes seur-slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Estados de carga */
+.seur-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--seur-border-radius);
+}
+
+/* Indicador de productos agregados */
+.seur-product-added {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--seur-success-color);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  animation: seur-popIn 0.3s ease-out;
+}
+
+@keyframes seur-popIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Tooltip para información adicional */
+.seur-tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.seur-tooltip:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--seur-dark-color);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 10000;
+  margin-bottom: 8px;
+}
+
+.seur-tooltip:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--seur-dark-color);
+  margin-bottom: 4px;
+}
+
+/* Estados de éxito */
+.seur-success-animation {
+  animation: seur-successPulse 0.6s ease-out;
+}
+
+@keyframes seur-successPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Modo oscuro (opcional) */
+@media (prefers-color-scheme: dark) {
+  .seur-shipping-widget {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+  
+  .seur-widget-body {
+    background: #2d3748;
+  }
+  
+  .seur-shipping-cost {
+    background: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .seur-shipping-details {
+    background: #4a5568;
+  }
+  
+  .seur-widget-footer {
+    background: #4a5568;
+    border-top-color: #718096;
+  }
+  
+  .seur-footer-text {
+    color: #a0aec0;
+  }
+}
