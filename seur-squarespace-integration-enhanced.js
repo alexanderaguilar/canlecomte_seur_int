@@ -142,11 +142,11 @@ function injectSeurStyles() {
         .seur-shipping-widget {
             position: fixed !important;
             bottom: 20px !important;
-            right: 20px !important;
+            right: 90px !important;
             width: 320px !important;
             max-width: calc(100vw - 40px) !important;
             background: white !important;
-            border-radius: 12px !important;
+            border-radius: 4px !important;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
             z-index: 999999 !important;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
