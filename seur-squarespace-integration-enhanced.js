@@ -1,11 +1,12 @@
 /**
- * �� INTEGRACIÓN SEUR - SQUARESPACE ENHANCED (VERSIÓN CORREGIDA)
+ * �� INTEGRACIÓN SEUR - SQUARESPACE ENHANCED (VERSIÓN FINAL CORREGIDA)
  * 
  * Archivo principal para integrar el calculador de envío SEUR en Squarespace.
- * Este archivo incluye todo lo necesario para funcionar de forma independiente.
+ * Incluye validación del API Gateway y manejo robusto de errores.
  * 
- * @version 2.0.1 - CORREGIDO
+ * @version 2.1.0 - FINAL CORREGIDO
  * @author SEUR Integration Team
+ * @github https://github.com/alexanderaguilar/canlecomte_seur_int
  */
 
 // ==============================================================================
@@ -13,44 +14,125 @@
 // ==============================================================================
 
 window.SEUR_CONFIG = {
-    // Endpoint de la API Lambda
+    // Endpoint del API Gateway (CORREGIDO)
     endpoint: 'https://z788h4e4ed.execute-api.us-east-2.amazonaws.com/DeployProd',
-
+    
+    // Endpoint de respaldo para testing
+    fallbackEndpoint: 'https://z788h4e4ed.execute-api.us-east-2.amazonaws.com/DeployProd',
+    
     // Umbral para envío gratuito (en euros)
     freeShippingThreshold: 50.0,
-
+    
     // Intervalo de actualización del carrito (ms)
-    updateInterval: 2000,
-
+    updateInterval: 3000,
+    
     // Mostrar detalles de productos en el widget
     showProductDetails: true,
-
+    
     // Mostrar detalles técnicos del envío
     showShippingDetails: true,
-
+    
     // Posición del widget
     position: 'bottom-right',
-
+    
     // Tema visual
     theme: 'light',
-
+    
     // Idioma
     language: 'es',
-
+    
     // Configuración de debugging
-    debug: true
+    debug: true,
+    
+    // Timeout para requests (ms)
+    requestTimeout: 10000,
+    
+    // Reintentos en caso de fallo
+    maxRetries: 3
 };
+
+// ==============================================================================
+// VALIDACIÓN DEL API GATEWAY
+// ==============================================================================
+
+class SeurApiValidator {
+    constructor(config) {
+        this.config = config;
+        this.isValid = false;
+        this.lastCheck = null;
+        this.checkInterval = 60000; // 1 minuto
+    }
+
+    async validateEndpoint() {
+        try {
+            console.log('[SEUR API] Validando endpoint:', this.config.endpoint);
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), this.config.requestTimeout);
+            
+            const response = await fetch(this.config.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    test: true,
+                    cart_items: [],
+                    shipping_address: { countryCode: 'ES' },
+                    order_total: 0
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.isValid = true;
+                this.lastCheck = Date.now();
+                console.log('[SEUR API] ✅ Endpoint válido:', result);
+                return true;
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+        } catch (error) {
+            this.isValid = false;
+            console.error('[SEUR API] ❌ Error validando endpoint:', error);
+            
+            if (error.name === 'AbortError') {
+                console.error('[SEUR API] Timeout del endpoint');
+            }
+            
+            return false;
+        }
+    }
+
+    async checkHealth() {
+        if (!this.lastCheck || (Date.now() - this.lastCheck) > this.checkInterval) {
+            return await this.validateEndpoint();
+        }
+        return this.isValid;
+    }
+
+    getStatus() {
+        return {
+            isValid: this.isValid,
+            lastCheck: this.lastCheck,
+            endpoint: this.config.endpoint
+        };
+    }
+}
 
 // ==============================================================================
 // INYECCIÓN DE ESTILOS CSS (CORREGIDO)
 // ==============================================================================
 
 function injectSeurStyles() {
-    // Verificar si ya se inyectaron los estilos
     if (document.getElementById('seur-styles-injected')) {
         return;
     }
-
+    
     const styles = `
         .seur-shipping-widget {
             position: fixed !important;
@@ -67,11 +149,11 @@ function injectSeurStyles() {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             transform: translateY(0) !important;
             border: 1px solid #e0e0e0 !important;
+            display: block !important;
         }
 
-        .seur-shipping-widget:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+        .seur-shipping-widget.hidden {
+            display: none !important;
         }
 
         .seur-widget-header {
@@ -148,7 +230,7 @@ function injectSeurStyles() {
             color: #343a40 !important;
         }
 
-        .seur-widget-loading .seur-spinner {
+        .seur-spinner {
             display: inline-block !important;
             width: 20px !important;
             height: 20px !important;
@@ -164,7 +246,7 @@ function injectSeurStyles() {
             100% { transform: rotate(360deg); }
         }
 
-        .seur-widget-loading .seur-loading-text {
+        .seur-loading-text {
             font-size: 13px !important;
             color: #343a40 !important;
         }
@@ -427,6 +509,33 @@ function injectSeurStyles() {
             100% { transform: scale(1); }
         }
 
+        .seur-api-status {
+            position: fixed !important;
+            top: 20px !important;
+            right: 20px !important;
+            padding: 8px 12px !important;
+            border-radius: 6px !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            z-index: 1000000 !important;
+            transition: all 0.3s ease !important;
+        }
+
+        .seur-api-status.connected {
+            background: #28a745 !important;
+            color: white !important;
+        }
+
+        .seur-api-status.disconnected {
+            background: #dc3545 !important;
+            color: white !important;
+        }
+
+        .seur-api-status.checking {
+            background: #ffc107 !important;
+            color: #343a40 !important;
+        }
+
         @media (max-width: 768px) {
             .seur-shipping-widget {
                 bottom: 10px !important;
@@ -445,13 +554,13 @@ function injectSeurStyles() {
             }
         }
     `;
-
+    
     const styleSheet = document.createElement('style');
     styleSheet.id = 'seur-styles-injected';
     styleSheet.textContent = styles;
     document.head.appendChild(styleSheet);
-
-    console.log('[SEUR] Estilos CSS inyectados correctamente');
+    
+    console.log('[SEUR] ✅ Estilos CSS inyectados correctamente');
 }
 
 // ==============================================================================
@@ -470,18 +579,31 @@ class SeurShippingWidget {
             error: null
         };
         this.elements = {};
+        this.apiValidator = new SeurApiValidator(this.config);
         this.init();
     }
 
-    init() {
+    async init() {
         try {
-            console.log('[SEUR] Inicializando widget...');
+            console.log('[SEUR] 🚀 Inicializando widget...');
+            
+            // Validar API Gateway primero
+            const apiValid = await this.apiValidator.validateEndpoint();
+            if (!apiValid) {
+                console.warn('[SEUR] ⚠️ API Gateway no disponible, usando modo offline');
+            }
+            
             this.createWidget();
             this.attachEventListeners();
             this.startCartMonitoring();
-            console.log('[SEUR] Widget inicializado correctamente');
+            
+            console.log('[SEUR] ✅ Widget inicializado correctamente');
+            
+            // Mostrar estado del API
+            this.showApiStatus();
+            
         } catch (error) {
-            console.error('[SEUR] Error inicializando widget:', error);
+            console.error('[SEUR] ❌ Error inicializando widget:', error);
         }
     }
 
@@ -509,7 +631,7 @@ class SeurShippingWidget {
                 <div class="seur-widget-body" id="seur-widget-body">
                     <div class="seur-widget-loading" id="seur-widget-loading">
                         <div class="seur-spinner"></div>
-                        <div class="seur-loading-text">Calculando envío...</div>
+                        <div class="seur-loading-text">Inicializando...</div>
                     </div>
                 </div>
                 
@@ -522,7 +644,7 @@ class SeurShippingWidget {
         `;
 
         document.body.appendChild(widget);
-        console.log('[SEUR] Widget creado y agregado al DOM');
+        console.log('[SEUR] ✅ Widget creado y agregado al DOM');
 
         this.elements.widget = widget;
         this.elements.header = widget.querySelector('#seur-widget-header');
@@ -530,6 +652,56 @@ class SeurShippingWidget {
         this.elements.body = widget.querySelector('#seur-widget-body');
         this.elements.toggle = widget.querySelector('#seur-widget-toggle');
         this.elements.loading = widget.querySelector('#seur-widget-loading');
+        
+        // Mostrar widget inmediatamente
+        this.showWidget();
+    }
+
+    showWidget() {
+        if (this.elements.widget) {
+            this.elements.widget.style.display = 'block';
+            this.elements.widget.classList.remove('hidden');
+            console.log('[SEUR] Widget mostrado');
+        }
+    }
+
+    hideWidget() {
+        if (this.elements.widget) {
+            this.elements.widget.style.display = 'none';
+            this.elements.widget.classList.add('hidden');
+            console.log('[SEUR] Widget oculto');
+        }
+    }
+
+    showApiStatus() {
+        // Crear indicador de estado del API
+        let statusElement = document.getElementById('seur-api-status');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'seur-api-status';
+            statusElement.className = 'seur-api-status checking';
+            statusElement.textContent = '�� Verificando API...';
+            document.body.appendChild(statusElement);
+        }
+
+        // Actualizar estado
+        const updateStatus = () => {
+            const status = this.apiValidator.getStatus();
+            if (status.isValid) {
+                statusElement.className = 'seur-api-status connected';
+                statusElement.textContent = '✅ API Conectado';
+                setTimeout(() => {
+                    statusElement.style.opacity = '0';
+                    setTimeout(() => statusElement.remove(), 300);
+                }, 3000);
+            } else {
+                statusElement.className = 'seur-api-status disconnected';
+                statusElement.textContent = '❌ API Desconectado';
+            }
+        };
+
+        updateStatus();
+        setInterval(updateStatus, 30000); // Actualizar cada 30 segundos
     }
 
     attachEventListeners() {
@@ -550,7 +722,7 @@ class SeurShippingWidget {
             }
         });
 
-        console.log('[SEUR] Event listeners configurados');
+        console.log('[SEUR] ✅ Event listeners configurados');
     }
 
     toggleWidget() {
@@ -578,7 +750,7 @@ class SeurShippingWidget {
     }
 
     startCartMonitoring() {
-        console.log('[SEUR] Iniciando monitoreo del carrito...');
+        console.log('[SEUR] �� Iniciando monitoreo del carrito...');
         this.updateFromDOM();
         setInterval(() => this.updateFromDOM(), this.config.updateInterval);
     }
@@ -587,25 +759,27 @@ class SeurShippingWidget {
         try {
             const cartData = this.extractCartDataFromDOM();
             if (cartData && this.hasCartChanged(cartData)) {
-                console.log('[SEUR] Cambios detectados en el carrito:', cartData);
+                console.log('[SEUR] �� Cambios detectados en el carrito:', cartData);
                 this.handleCartUpdate(cartData);
             }
         } catch (error) {
-            console.warn('[SEUR] Error actualizando desde DOM:', error);
+            console.warn('[SEUR] ⚠️ Error actualizando desde DOM:', error);
         }
     }
 
     extractCartDataFromDOM() {
         const cartItems = [];
-
-        // Selectores más específicos para Squarespace
+        
+        // Selectores específicos para Squarespace
         const itemSelectors = [
             '.cart-item',
             '[data-cart-item]',
             '.sqs-cart-item',
             '.cart-product',
             '.product-item',
-            '.item'
+            '.item',
+            '.product',
+            '[data-product]'
         ];
 
         itemSelectors.forEach(selector => {
@@ -624,9 +798,11 @@ class SeurShippingWidget {
                 '.product',
                 '.item',
                 '[data-product]',
-                '.cart-product'
+                '.cart-product',
+                '.product-card',
+                '.product-info'
             ];
-
+            
             generalSelectors.forEach(selector => {
                 const items = document.querySelectorAll(selector);
                 items.forEach(item => {
@@ -654,17 +830,19 @@ class SeurShippingWidget {
             // Selectores más flexibles para Squarespace
             const nameSelectors = [
                 '.item-title', '.cart-item-title', '[data-item-title]', '.product-title',
-                '.title', '.name', '.product-name', '.item-name', 'h1', 'h2', 'h3'
+                '.title', '.name', '.product-name', '.item-name', 'h1', 'h2', 'h3',
+                '.product-title', '.item-name', '.product-name'
             ];
-
+            
             const priceSelectors = [
                 '.item-price', '.cart-item-price', '[data-item-price]', '.product-price',
-                '.price', '.cost', '.amount', '[data-price]'
+                '.price', '.cost', '.amount', '[data-price]', '.product-price',
+                '.price-value', '.cost-value'
             ];
-
+            
             const quantitySelectors = [
                 '.item-quantity', '.cart-item-quantity', '[data-item-quantity]', '.product-quantity',
-                '.quantity', '.qty', '[data-quantity]', '.count'
+                '.quantity', '.qty', '[data-quantity]', '.count', '.product-quantity'
             ];
 
             const nameElement = this.findElement(itemElement, nameSelectors);
@@ -688,7 +866,7 @@ class SeurShippingWidget {
                 productId: itemElement.dataset.productId || `PROD-${Date.now()}`
             };
         } catch (error) {
-            console.warn('[SEUR] Error extrayendo datos de item:', error);
+            console.warn('[SEUR] ⚠️ Error extrayendo datos de item:', error);
             return null;
         }
     }
@@ -703,33 +881,33 @@ class SeurShippingWidget {
 
     hasCartChanged(newCartData) {
         if (!this.state.cartData) return true;
-
+        
         const oldCart = this.state.cartData;
         const newCart = newCartData;
 
         if (oldCart.itemCount !== newCart.itemCount) return true;
         if (Math.abs(oldCart.total - newCart.total) > 0.01) return true;
         if (oldCart.items.length !== newCart.items.length) return true;
-
+        
         for (let i = 0; i < oldCart.items.length; i++) {
             const oldItem = oldCart.items[i];
             const newItem = newCart.items[i];
-
-            if (oldItem.sku !== newItem.sku ||
+            
+            if (oldItem.sku !== newItem.sku || 
                 oldItem.quantity !== newItem.quantity ||
                 Math.abs(oldItem.price - newItem.price) > 0.01) {
                 return true;
             }
         }
-
+        
         return false;
     }
 
     handleCartUpdate(cartData) {
-        console.log('[SEUR] Carrito actualizado:', cartData);
-
+        console.log('[SEUR] 📦 Carrito actualizado:', cartData);
+        
         this.state.cartData = cartData;
-
+        
         if (cartData.items.length === 0) {
             this.showEmptyCart();
         } else {
@@ -747,59 +925,32 @@ class SeurShippingWidget {
                 </div>
             </div>
         `;
-
+        
         this.expandWidget();
     }
 
     async calculateShipping(cartData) {
         if (this.state.isCalculating) return;
-
+        
         this.state.isCalculating = true;
         this.showCalculatingState();
-
+        
         try {
-            const requestData = {
-                cart_items: cartData.items.map(item => ({
-                    productId: item.productId,
-                    sku: item.sku,
-                    name: item.name,
-                    quantity: item.quantity,
-                    price: item.price
-                })),
-                shipping_address: this.getDefaultShippingAddress(),
-                order_total: cartData.total
-            };
-
-            console.log('[SEUR] Calculando envío con datos:', requestData);
-
-            const response = await fetch(this.config.endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestData)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            console.log('[SEUR] Resultado del cálculo:', result);
-
-            this.state.shippingData = result;
-            this.state.lastCalculation = Date.now();
-
-            if (result.success) {
-                this.displayShippingResult(result, cartData);
+            // Verificar API Gateway primero
+            const apiValid = await this.apiValidator.checkHealth();
+            
+            if (apiValid) {
+                await this.calculateWithApi(cartData);
             } else {
-                this.displayShippingError(result.message || 'Error en el cálculo');
+                console.log('[SEUR] �� API no disponible, usando cálculo local');
+                const fallbackResult = this.calculateFallbackShipping(cartData);
+                this.displayShippingResult(fallbackResult, cartData);
             }
 
         } catch (error) {
-            console.error('[SEUR] Error calculando envío:', error);
+            console.error('[SEUR] ❌ Error calculando envío:', error);
             this.displayShippingError('Error de conexión. Usando cálculo local.');
-
+            
             const fallbackResult = this.calculateFallbackShipping(cartData);
             this.displayShippingResult(fallbackResult, cartData);
         } finally {
@@ -807,25 +958,77 @@ class SeurShippingWidget {
         }
     }
 
-    calculateFallbackShipping(cartData) {
-        console.log('[SEUR] Usando cálculo de fallback');
+    async calculateWithApi(cartData) {
+        const requestData = {
+            cart_items: cartData.items.map(item => ({
+                productId: item.productId,
+                sku: item.sku,
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price
+            })),
+            shipping_address: this.getDefaultShippingAddress(),
+            order_total: cartData.total
+        };
 
+        console.log('[SEUR] �� Calculando con API:', requestData);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.config.requestTimeout);
+
+        try {
+            const response = await fetch(this.config.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('[SEUR] ✅ Resultado del API:', result);
+
+            this.state.shippingData = result;
+            this.state.lastCalculation = Date.now();
+            
+            if (result.success) {
+                this.displayShippingResult(result, cartData);
+            } else {
+                this.displayShippingError(result.message || 'Error en el cálculo del API');
+            }
+
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
+    }
+
+    calculateFallbackShipping(cartData) {
+        console.log('[SEUR] 🔄 Usando cálculo de fallback');
+        
         const baseShippingCost = 15.0;
         const weightCost = cartData.items.reduce((total, item) => {
             return total + (item.quantity * 1.0);
         }, 0) * 1.5;
-
+        
         const shippingCost = baseShippingCost + weightCost;
         const isFree = cartData.total >= this.config.freeShippingThreshold;
-
+        
         return {
             success: true,
             shipping_cost: isFree ? 0 : shippingCost,
             shipping_payment_required: !isFree,
-            shipping_message: isFree
+            shipping_message: isFree 
                 ? `¡Envío gratuito! Tu pedido supera los ${this.config.freeShippingThreshold}€`
                 : `Envío con costo. Añade ${(this.config.freeShippingThreshold - cartData.total).toFixed(2)}€ más para envío gratuito`,
-            calculation_method: "fallback",
+            calculation_method: "cálculo local",
             total_weight: cartData.items.reduce((total, item) => total + item.quantity, 0),
             parcels_count: 1
         };
@@ -839,14 +1042,14 @@ class SeurShippingWidget {
                 <div class="seur-loading-text">Calculando envío con SEUR...</div>
             </div>
         `;
-
+        
         this.expandWidget();
     }
 
     displayShippingResult(result, cartData) {
         const shippingCost = result.shipping_cost;
         const isFree = !result.shipping_payment_required;
-
+        
         let html = `
             <div class="seur-shipping-info">
                 <div class="seur-shipping-cost ${isFree ? 'free' : ''}">
@@ -881,6 +1084,7 @@ class SeurShippingWidget {
                         <span class="seur-detail-value">${result.total_weight}kg</span>
                     </div>
                     <div class="seur-detail-row">
+                        <span class="seur-item-icon">📦</span>
                         <span class="seur-detail-label">Bultos:</span>
                         <span class="seur-detail-value">${result.parcels_count}</span>
                     </div>
@@ -899,7 +1103,7 @@ class SeurShippingWidget {
                         Productos en el carrito:
                     </div>
             `;
-
+            
             cartData.items.forEach(item => {
                 html += `
                     <div class="seur-cart-item">
@@ -914,7 +1118,7 @@ class SeurShippingWidget {
                     </div>
                 `;
             });
-
+            
             html += `</div>`;
         }
 
@@ -950,7 +1154,7 @@ class SeurShippingWidget {
                 🔄 Reintentar
             </button>
         `;
-
+        
         this.elements.loading.style.display = 'none';
 
         const retryBtn = this.elements.body.querySelector('#seur-recalculate-btn');
@@ -984,32 +1188,32 @@ class SeurShippingWidget {
 
 function initializeSeurIntegration() {
     try {
-        console.log('[SEUR] Iniciando integración...');
-
+        console.log('[SEUR] 🚀 Iniciando integración...');
+        
         // Inyectar estilos primero
         injectSeurStyles();
-
+        
         // Esperar un poco para que el DOM esté completamente listo
         setTimeout(() => {
             // Crear widget
             const widget = new SeurShippingWidget();
-
+            
             // Guardar referencia global
             window.seurWidget = widget;
-
-            console.log('[SEUR] Integración inicializada correctamente');
-
+            
+            console.log('[SEUR] ✅ Integración inicializada correctamente');
+            
             // Mostrar notificación de éxito
             if (window.SEUR_CONFIG.debug) {
                 console.log('[SEUR] Widget creado:', widget);
                 console.log('[SEUR] Configuración:', window.SEUR_CONFIG);
             }
-
+            
         }, 1000);
-
+        
         return true;
     } catch (error) {
-        console.error('[SEUR] Error inicializando integración:', error);
+        console.error('[SEUR] ❌ Error inicializando integración:', error);
         return false;
     }
 }
@@ -1017,11 +1221,11 @@ function initializeSeurIntegration() {
 // Inicializar cuando el DOM esté listo
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('[SEUR] DOM cargado, inicializando...');
+        console.log('[SEUR] 📄 DOM cargado, inicializando...');
         initializeSeurIntegration();
     });
 } else {
-    console.log('[SEUR] DOM ya listo, inicializando...');
+    console.log('[SEUR] 📄 DOM ya listo, inicializando...');
     initializeSeurIntegration();
 }
 
@@ -1029,5 +1233,6 @@ if (document.readyState === 'loading') {
 window.initializeSeurShipping = initializeSeurIntegration;
 
 // Verificar que se cargó correctamente
-console.log('[SEUR] Script cargado correctamente');
-console.log('[SEUR] Función disponible: window.initializeSeurShipping()');
+console.log('[SEUR] ✅ Script cargado correctamente');
+console.log('[SEUR] �� Función disponible: window.initializeSeurShipping()');
+console.log('[SEUR] 🌐 Endpoint configurado:', window.SEUR_CONFIG.endpoint);
