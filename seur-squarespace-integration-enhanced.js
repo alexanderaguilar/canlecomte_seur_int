@@ -4,7 +4,7 @@
  * Archivo principal para integrar el calculador de envío SEUR en Squarespace.
  * Incluye validación del API Gateway y manejo robusto de errores.
  * 
- * @version 2.1.0 - FINAL CORREGIDO
+ * @version 2.2.0 - ENDPOINTS CORREGIDOS
  * @author SEUR Integration Team
  * @github https://github.com/alexanderaguilar/canlecomte_seur_int
  */
@@ -14,11 +14,14 @@
 // ==============================================================================
 
 window.SEUR_CONFIG = {
-    // Endpoint del API Gateway (CORREGIDO)
-    endpoint: 'https://z788h4e4ed.execute-api.us-east-2.amazonaws.com/DeployProd',
+    // Base URL del API Gateway
+    baseUrl: 'https://z788h4e4ed.execute-api.us-east-2.amazonaws.com/DeployProd',
     
-    // Endpoint de respaldo para testing
-    fallbackEndpoint: 'https://z788h4e4ed.execute-api.us-east-2.amazonaws.com/DeployProd',
+    // Endpoints específicos
+    endpoints: {
+        shippingCalculator: '/checkout-shipping',
+        orderProcessor: '/process-order'
+    },
     
     // Umbral para envío gratuito (en euros)
     freeShippingThreshold: 50.0,
@@ -65,12 +68,13 @@ class SeurApiValidator {
 
     async validateEndpoint() {
         try {
-            console.log('[SEUR API] Validando endpoint:', this.config.endpoint);
+            const endpoint = this.config.baseUrl + this.config.endpoints.shippingCalculator;
+            console.log('[SEUR API] �� Validando endpoint:', endpoint);
             
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), this.config.requestTimeout);
             
-            const response = await fetch(this.config.endpoint, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -119,7 +123,8 @@ class SeurApiValidator {
         return {
             isValid: this.isValid,
             lastCheck: this.lastCheck,
-            endpoint: this.config.endpoint
+            baseUrl: this.config.baseUrl,
+            endpoints: this.config.endpoints
         };
     }
 }
@@ -959,6 +964,7 @@ class SeurShippingWidget {
     }
 
     async calculateWithApi(cartData) {
+        const endpoint = this.config.baseUrl + this.config.endpoints.shippingCalculator;
         const requestData = {
             cart_items: cartData.items.map(item => ({
                 productId: item.productId,
@@ -971,13 +977,14 @@ class SeurShippingWidget {
             order_total: cartData.total
         };
 
-        console.log('[SEUR] �� Calculando con API:', requestData);
+        console.log('[SEUR] �� Calculando con API:', endpoint);
+        console.log('[SEUR] 📤 Datos enviados:', requestData);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.config.requestTimeout);
 
         try {
-            const response = await fetch(this.config.endpoint, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1084,7 +1091,6 @@ class SeurShippingWidget {
                         <span class="seur-detail-value">${result.total_weight}kg</span>
                     </div>
                     <div class="seur-detail-row">
-                        <span class="seur-item-icon">📦</span>
                         <span class="seur-detail-label">Bultos:</span>
                         <span class="seur-detail-value">${result.parcels_count}</span>
                     </div>
@@ -1157,7 +1163,7 @@ class SeurShippingWidget {
         
         this.elements.loading.style.display = 'none';
 
-        const retryBtn = this.elements.body.querySelector('#seur-recalculate-btn');
+        const recalcBtn = this.elements.body.querySelector('#seur-recalculate-btn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => {
                 if (this.state.cartData) {
@@ -1173,6 +1179,34 @@ class SeurShippingWidget {
             city: '',
             postalCode: ''
         };
+    }
+
+    // Método para procesar la orden (nuevo)
+    async processOrder(orderData) {
+        try {
+            const endpoint = this.config.baseUrl + this.config.endpoints.orderProcessor;
+            console.log('[SEUR] 🚀 Procesando orden:', endpoint);
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('[SEUR] ✅ Orden procesada:', result);
+            return result;
+
+        } catch (error) {
+            console.error('[SEUR] ❌ Error procesando orden:', error);
+            throw error;
+        }
     }
 
     destroy() {
@@ -1207,6 +1241,7 @@ function initializeSeurIntegration() {
             if (window.SEUR_CONFIG.debug) {
                 console.log('[SEUR] Widget creado:', widget);
                 console.log('[SEUR] Configuración:', window.SEUR_CONFIG);
+                console.log('[SEUR] Endpoints configurados:', window.SEUR_CONFIG.endpoints);
             }
             
         }, 1000);
@@ -1235,4 +1270,5 @@ window.initializeSeurShipping = initializeSeurIntegration;
 // Verificar que se cargó correctamente
 console.log('[SEUR] ✅ Script cargado correctamente');
 console.log('[SEUR] �� Función disponible: window.initializeSeurShipping()');
-console.log('[SEUR] 🌐 Endpoint configurado:', window.SEUR_CONFIG.endpoint);
+console.log('[SEUR] 🌐 Base URL configurada:', window.SEUR_CONFIG.baseUrl);
+console.log('[SEUR] 📍 Endpoints configurados:', window.SEUR_CONFIG.endpoints);
