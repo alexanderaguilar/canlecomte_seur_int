@@ -1,10 +1,10 @@
 /**
- * 🚚 INTEGRACIÓN SEUR - SQUARESPACE ENHANCED
+ * �� INTEGRACIÓN SEUR - SQUARESPACE ENHANCED (VERSIÓN CORREGIDA)
  * 
  * Archivo principal para integrar el calculador de envío SEUR en Squarespace.
  * Este archivo incluye todo lo necesario para funcionar de forma independiente.
  * 
- * @version 2.0.0
+ * @version 2.0.1 - CORREGIDO
  * @author SEUR Integration Team
  */
 
@@ -15,34 +15,447 @@
 window.SEUR_CONFIG = {
     // Endpoint de la API Lambda
     endpoint: 'https://z788h4e4ed.execute-api.us-east-2.amazonaws.com/DeployProd',
-    
+
     // Umbral para envío gratuito (en euros)
     freeShippingThreshold: 50.0,
-    
+
     // Intervalo de actualización del carrito (ms)
     updateInterval: 2000,
-    
+
     // Mostrar detalles de productos en el widget
     showProductDetails: true,
-    
+
     // Mostrar detalles técnicos del envío
     showShippingDetails: true,
-    
+
     // Posición del widget
     position: 'bottom-right',
-    
+
     // Tema visual
     theme: 'light',
-    
+
     // Idioma
     language: 'es',
-    
+
     // Configuración de debugging
-    debug: false
+    debug: true
 };
 
 // ==============================================================================
-// WIDGET FLOTANTE DE ENVÍO SEUR
+// INYECCIÓN DE ESTILOS CSS (CORREGIDO)
+// ==============================================================================
+
+function injectSeurStyles() {
+    // Verificar si ya se inyectaron los estilos
+    if (document.getElementById('seur-styles-injected')) {
+        return;
+    }
+
+    const styles = `
+        .seur-shipping-widget {
+            position: fixed !important;
+            bottom: 20px !important;
+            right: 20px !important;
+            width: 320px !important;
+            max-width: calc(100vw - 40px) !important;
+            background: white !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+            z-index: 999999 !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            overflow: hidden !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            transform: translateY(0) !important;
+            border: 1px solid #e0e0e0 !important;
+        }
+
+        .seur-shipping-widget:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        .seur-widget-header {
+            background: linear-gradient(135deg, #0066cc, #004499) !important;
+            color: white !important;
+            padding: 16px 20px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            cursor: pointer !important;
+            user-select: none !important;
+        }
+
+        .seur-widget-header:hover {
+            background: linear-gradient(135deg, #004499, #0066cc) !important;
+        }
+
+        .seur-widget-title {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+        }
+
+        .seur-widget-icon {
+            font-size: 18px !important;
+            animation: seur-bounce 2s infinite !important;
+        }
+
+        @keyframes seur-bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-3px); }
+            60% { transform: translateY(-2px); }
+        }
+
+        .seur-widget-toggle {
+            background: rgba(255, 255, 255, 0.2) !important;
+            border: none !important;
+            color: white !important;
+            width: 24px !important;
+            height: 24px !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            font-size: 12px !important;
+        }
+
+        .seur-widget-toggle:hover {
+            background: rgba(255, 255, 255, 0.3) !important;
+            transform: rotate(180deg) !important;
+        }
+
+        .seur-widget-content {
+            max-height: 0 !important;
+            overflow: hidden !important;
+            transition: max-height 0.3s ease-in-out !important;
+        }
+
+        .seur-widget-content.expanded {
+            max-height: 500px !important;
+        }
+
+        .seur-widget-body {
+            padding: 20px !important;
+        }
+
+        .seur-widget-loading {
+            text-align: center !important;
+            padding: 20px !important;
+            color: #343a40 !important;
+        }
+
+        .seur-widget-loading .seur-spinner {
+            display: inline-block !important;
+            width: 20px !important;
+            height: 20px !important;
+            border: 2px solid #f8f9fa !important;
+            border-top: 2px solid #0066cc !important;
+            border-radius: 50% !important;
+            animation: seur-spin 1s linear infinite !important;
+            margin-bottom: 12px !important;
+        }
+
+        @keyframes seur-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .seur-widget-loading .seur-loading-text {
+            font-size: 13px !important;
+            color: #343a40 !important;
+        }
+
+        .seur-shipping-info {
+            margin-bottom: 16px !important;
+        }
+
+        .seur-shipping-cost {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            margin-bottom: 12px !important;
+            padding: 12px !important;
+            background: #f8f9fa !important;
+            border-radius: 8px !important;
+            border-left: 4px solid #0066cc !important;
+        }
+
+        .seur-shipping-cost.free {
+            border-left-color: #28a745 !important;
+            background: #d4edda !important;
+        }
+
+        .seur-cost-label {
+            font-size: 13px !important;
+            color: #343a40 !important;
+            font-weight: 500 !important;
+        }
+
+        .seur-cost-value {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            color: #0066cc !important;
+        }
+
+        .seur-cost-value.free {
+            color: #28a745 !important;
+        }
+
+        .seur-cost-value.paid {
+            color: #dc3545 !important;
+        }
+
+        .seur-free-shipping-message {
+            background: linear-gradient(135deg, #28a745, #20c997) !important;
+            color: white !important;
+            padding: 12px !important;
+            border-radius: 8px !important;
+            text-align: center !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            margin-bottom: 12px !important;
+            animation: seur-pulse 2s infinite !important;
+        }
+
+        @keyframes seur-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .seur-free-shipping-icon {
+            margin-right: 6px !important;
+            font-size: 14px !important;
+        }
+
+        .seur-motivational-message {
+            background: #ffc107 !important;
+            color: #343a40 !important;
+            padding: 10px 12px !important;
+            border-radius: 6px !important;
+            font-size: 12px !important;
+            text-align: center !important;
+            margin-bottom: 12px !important;
+            border-left: 3px solid #e0a800 !important;
+        }
+
+        .seur-remaining-amount {
+            font-weight: 700 !important;
+            color: #0066cc !important;
+        }
+
+        .seur-shipping-details {
+            background: #f8f9fa !important;
+            border-radius: 8px !important;
+            padding: 12px !important;
+            margin-bottom: 16px !important;
+        }
+
+        .seur-detail-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            margin-bottom: 6px !important;
+            font-size: 12px !important;
+        }
+
+        .seur-detail-row:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        .seur-detail-label {
+            color: #343a40 !important;
+            font-weight: 500 !important;
+        }
+
+        .seur-detail-value {
+            color: #0066cc !important;
+            font-weight: 600 !important;
+        }
+
+        .seur-cart-items {
+            margin-bottom: 16px !important;
+        }
+
+        .seur-cart-item {
+            display: flex !important;
+            align-items: center !important;
+            padding: 8px 0 !important;
+            border-bottom: 1px solid #e9ecef !important;
+        }
+
+        .seur-cart-item:last-child {
+            border-bottom: none !important;
+        }
+
+        .seur-item-icon {
+            width: 32px !important;
+            height: 32px !important;
+            background: #0066cc !important;
+            border-radius: 6px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: white !important;
+            font-size: 14px !important;
+            margin-right: 12px !important;
+            flex-shrink: 0 !important;
+        }
+
+        .seur-item-details {
+            flex: 1 !important;
+            min-width: 0 !important;
+        }
+
+        .seur-item-name {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #343a40 !important;
+            margin-bottom: 2px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .seur-item-info {
+            font-size: 11px !important;
+            color: #6c757d !important;
+            display: flex !important;
+            gap: 8px !important;
+        }
+
+        .seur-item-quantity {
+            background: #0066cc !important;
+            color: white !important;
+            padding: 2px 6px !important;
+            border-radius: 10px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+        }
+
+        .seur-widget-error {
+            background: #dc3545 !important;
+            color: white !important;
+            padding: 16px !important;
+            text-align: center !important;
+            border-radius: 8px !important;
+            margin: 16px 0 !important;
+        }
+
+        .seur-error-icon {
+            font-size: 24px !important;
+            margin-bottom: 8px !important;
+        }
+
+        .seur-error-message {
+            font-size: 13px !important;
+            line-height: 1.4 !important;
+        }
+
+        .seur-recalculate-btn {
+            width: 100% !important;
+            background: #0066cc !important;
+            color: white !important;
+            border: none !important;
+            padding: 12px !important;
+            border-radius: 8px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            margin-top: 8px !important;
+        }
+
+        .seur-recalculate-btn:hover {
+            background: #004499 !important;
+            transform: translateY(-1px) !important;
+        }
+
+        .seur-recalculate-btn:active {
+            transform: translateY(0) !important;
+        }
+
+        .seur-widget-footer {
+            background: #f8f9fa !important;
+            padding: 12px 20px !important;
+            text-align: center !important;
+            border-top: 1px solid #e9ecef !important;
+        }
+
+        .seur-footer-text {
+            font-size: 11px !important;
+            color: #6c757d !important;
+        }
+
+        .seur-footer-logo {
+            color: #0066cc !important;
+            font-weight: 600 !important;
+        }
+
+        .seur-widget.minimized .seur-widget-content {
+            max-height: 0 !important;
+        }
+
+        .seur-widget.minimized .seur-widget-toggle {
+            transform: rotate(0deg) !important;
+        }
+
+        .seur-widget-enter {
+            animation: seur-slideIn 0.3s ease-out !important;
+        }
+
+        @keyframes seur-slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .seur-success-animation {
+            animation: seur-successPulse 0.6s ease-out !important;
+        }
+
+        @keyframes seur-successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .seur-shipping-widget {
+                bottom: 10px !important;
+                right: 10px !important;
+                left: 10px !important;
+                width: auto !important;
+                max-width: none !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .seur-shipping-widget {
+                bottom: 5px !important;
+                right: 5px !important;
+                left: 5px !important;
+            }
+        }
+    `;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'seur-styles-injected';
+    styleSheet.textContent = styles;
+    document.head.appendChild(styleSheet);
+
+    console.log('[SEUR] Estilos CSS inyectados correctamente');
+}
+
+// ==============================================================================
+// WIDGET FLOTANTE DE ENVÍO SEUR (CORREGIDO)
 // ==============================================================================
 
 class SeurShippingWidget {
@@ -62,6 +475,7 @@ class SeurShippingWidget {
 
     init() {
         try {
+            console.log('[SEUR] Inicializando widget...');
             this.createWidget();
             this.attachEventListeners();
             this.startCartMonitoring();
@@ -72,6 +486,12 @@ class SeurShippingWidget {
     }
 
     createWidget() {
+        // Verificar si ya existe el widget
+        if (document.getElementById('seur-shipping-widget')) {
+            console.log('[SEUR] Widget ya existe, no se crea otro');
+            return;
+        }
+
         const widget = document.createElement('div');
         widget.className = 'seur-shipping-widget seur-widget-enter';
         widget.id = 'seur-shipping-widget';
@@ -102,6 +522,7 @@ class SeurShippingWidget {
         `;
 
         document.body.appendChild(widget);
+        console.log('[SEUR] Widget creado y agregado al DOM');
 
         this.elements.widget = widget;
         this.elements.header = widget.querySelector('#seur-widget-header');
@@ -112,6 +533,11 @@ class SeurShippingWidget {
     }
 
     attachEventListeners() {
+        if (!this.elements.header || !this.elements.toggle) {
+            console.error('[SEUR] Elementos no encontrados para event listeners');
+            return;
+        }
+
         this.elements.header.addEventListener('click', () => this.toggleWidget());
         this.elements.toggle.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -123,6 +549,8 @@ class SeurShippingWidget {
                 this.collapseWidget();
             }
         });
+
+        console.log('[SEUR] Event listeners configurados');
     }
 
     toggleWidget() {
@@ -138,6 +566,7 @@ class SeurShippingWidget {
         this.elements.content.classList.add('expanded');
         this.elements.toggle.textContent = '▲';
         this.elements.widget.classList.remove('minimized');
+        console.log('[SEUR] Widget expandido');
     }
 
     collapseWidget() {
@@ -145,9 +574,11 @@ class SeurShippingWidget {
         this.elements.content.classList.remove('expanded');
         this.elements.toggle.textContent = '▼';
         this.elements.widget.classList.add('minimized');
+        console.log('[SEUR] Widget colapsado');
     }
 
     startCartMonitoring() {
+        console.log('[SEUR] Iniciando monitoreo del carrito...');
         this.updateFromDOM();
         setInterval(() => this.updateFromDOM(), this.config.updateInterval);
     }
@@ -156,6 +587,7 @@ class SeurShippingWidget {
         try {
             const cartData = this.extractCartDataFromDOM();
             if (cartData && this.hasCartChanged(cartData)) {
+                console.log('[SEUR] Cambios detectados en el carrito:', cartData);
                 this.handleCartUpdate(cartData);
             }
         } catch (error) {
@@ -165,11 +597,15 @@ class SeurShippingWidget {
 
     extractCartDataFromDOM() {
         const cartItems = [];
+
+        // Selectores más específicos para Squarespace
         const itemSelectors = [
             '.cart-item',
             '[data-cart-item]',
             '.sqs-cart-item',
-            '.cart-product'
+            '.cart-product',
+            '.product-item',
+            '.item'
         ];
 
         itemSelectors.forEach(selector => {
@@ -181,6 +617,26 @@ class SeurShippingWidget {
                 }
             });
         });
+
+        if (cartItems.length === 0) {
+            // Buscar en elementos más generales
+            const generalSelectors = [
+                '.product',
+                '.item',
+                '[data-product]',
+                '.cart-product'
+            ];
+
+            generalSelectors.forEach(selector => {
+                const items = document.querySelectorAll(selector);
+                items.forEach(item => {
+                    const itemData = this.extractItemDataFromDOM(item);
+                    if (itemData) {
+                        cartItems.push(itemData);
+                    }
+                });
+            });
+        }
 
         if (cartItems.length === 0) return null;
 
@@ -195,18 +651,34 @@ class SeurShippingWidget {
 
     extractItemDataFromDOM(itemElement) {
         try {
-            const nameElement = itemElement.querySelector('.item-title, .cart-item-title, [data-item-title], .product-title');
-            const priceElement = itemElement.querySelector('.item-price, .cart-item-price, [data-item-price], .product-price');
-            const quantityElement = itemElement.querySelector('.item-quantity, .cart-item-quantity, [data-item-quantity], .product-quantity');
+            // Selectores más flexibles para Squarespace
+            const nameSelectors = [
+                '.item-title', '.cart-item-title', '[data-item-title]', '.product-title',
+                '.title', '.name', '.product-name', '.item-name', 'h1', 'h2', 'h3'
+            ];
 
-            if (!nameElement || !priceElement || !quantityElement) return null;
+            const priceSelectors = [
+                '.item-price', '.cart-item-price', '[data-item-price]', '.product-price',
+                '.price', '.cost', '.amount', '[data-price]'
+            ];
+
+            const quantitySelectors = [
+                '.item-quantity', '.cart-item-quantity', '[data-item-quantity]', '.product-quantity',
+                '.quantity', '.qty', '[data-quantity]', '.count'
+            ];
+
+            const nameElement = this.findElement(itemElement, nameSelectors);
+            const priceElement = this.findElement(itemElement, priceSelectors);
+            const quantityElement = this.findElement(itemElement, quantitySelectors);
+
+            if (!nameElement || !priceElement) return null;
 
             const name = nameElement.textContent.trim();
             const price = parseFloat(priceElement.textContent.replace(/[^\d.,]/g, '').replace(',', '.'));
-            const quantity = parseInt(quantityElement.textContent.trim());
+            const quantity = quantityElement ? parseInt(quantityElement.textContent.trim()) : 1;
             const sku = `ITEM-${Date.now()}`;
 
-            if (isNaN(price) || isNaN(quantity)) return null;
+            if (isNaN(price) || price <= 0) return null;
 
             return {
                 name,
@@ -221,35 +693,43 @@ class SeurShippingWidget {
         }
     }
 
+    findElement(parent, selectors) {
+        for (const selector of selectors) {
+            const element = parent.querySelector(selector);
+            if (element) return element;
+        }
+        return null;
+    }
+
     hasCartChanged(newCartData) {
         if (!this.state.cartData) return true;
-        
+
         const oldCart = this.state.cartData;
         const newCart = newCartData;
 
         if (oldCart.itemCount !== newCart.itemCount) return true;
         if (Math.abs(oldCart.total - newCart.total) > 0.01) return true;
         if (oldCart.items.length !== newCart.items.length) return true;
-        
+
         for (let i = 0; i < oldCart.items.length; i++) {
             const oldItem = oldCart.items[i];
             const newItem = newCart.items[i];
-            
-            if (oldItem.sku !== newItem.sku || 
+
+            if (oldItem.sku !== newItem.sku ||
                 oldItem.quantity !== newItem.quantity ||
                 Math.abs(oldItem.price - newItem.price) > 0.01) {
                 return true;
             }
         }
-        
+
         return false;
     }
 
     handleCartUpdate(cartData) {
         console.log('[SEUR] Carrito actualizado:', cartData);
-        
+
         this.state.cartData = cartData;
-        
+
         if (cartData.items.length === 0) {
             this.showEmptyCart();
         } else {
@@ -267,16 +747,16 @@ class SeurShippingWidget {
                 </div>
             </div>
         `;
-        
+
         this.expandWidget();
     }
 
     async calculateShipping(cartData) {
         if (this.state.isCalculating) return;
-        
+
         this.state.isCalculating = true;
         this.showCalculatingState();
-        
+
         try {
             const requestData = {
                 cart_items: cartData.items.map(item => ({
@@ -309,7 +789,7 @@ class SeurShippingWidget {
 
             this.state.shippingData = result;
             this.state.lastCalculation = Date.now();
-            
+
             if (result.success) {
                 this.displayShippingResult(result, cartData);
             } else {
@@ -319,7 +799,7 @@ class SeurShippingWidget {
         } catch (error) {
             console.error('[SEUR] Error calculando envío:', error);
             this.displayShippingError('Error de conexión. Usando cálculo local.');
-            
+
             const fallbackResult = this.calculateFallbackShipping(cartData);
             this.displayShippingResult(fallbackResult, cartData);
         } finally {
@@ -329,20 +809,20 @@ class SeurShippingWidget {
 
     calculateFallbackShipping(cartData) {
         console.log('[SEUR] Usando cálculo de fallback');
-        
+
         const baseShippingCost = 15.0;
         const weightCost = cartData.items.reduce((total, item) => {
             return total + (item.quantity * 1.0);
         }, 0) * 1.5;
-        
+
         const shippingCost = baseShippingCost + weightCost;
         const isFree = cartData.total >= this.config.freeShippingThreshold;
-        
+
         return {
             success: true,
             shipping_cost: isFree ? 0 : shippingCost,
             shipping_payment_required: !isFree,
-            shipping_message: isFree 
+            shipping_message: isFree
                 ? `¡Envío gratuito! Tu pedido supera los ${this.config.freeShippingThreshold}€`
                 : `Envío con costo. Añade ${(this.config.freeShippingThreshold - cartData.total).toFixed(2)}€ más para envío gratuito`,
             calculation_method: "fallback",
@@ -359,14 +839,14 @@ class SeurShippingWidget {
                 <div class="seur-loading-text">Calculando envío con SEUR...</div>
             </div>
         `;
-        
+
         this.expandWidget();
     }
 
     displayShippingResult(result, cartData) {
         const shippingCost = result.shipping_cost;
         const isFree = !result.shipping_payment_required;
-        
+
         let html = `
             <div class="seur-shipping-info">
                 <div class="seur-shipping-cost ${isFree ? 'free' : ''}">
@@ -419,7 +899,7 @@ class SeurShippingWidget {
                         Productos en el carrito:
                     </div>
             `;
-            
+
             cartData.items.forEach(item => {
                 html += `
                     <div class="seur-cart-item">
@@ -434,7 +914,7 @@ class SeurShippingWidget {
                     </div>
                 `;
             });
-            
+
             html += `</div>`;
         }
 
@@ -470,7 +950,7 @@ class SeurShippingWidget {
                 🔄 Reintentar
             </button>
         `;
-        
+
         this.elements.loading.style.display = 'none';
 
         const retryBtn = this.elements.body.querySelector('#seur-recalculate-btn');
@@ -499,451 +979,55 @@ class SeurShippingWidget {
 }
 
 // ==============================================================================
-// INYECCIÓN DE ESTILOS CSS
-// ==============================================================================
-
-function injectSeurStyles() {
-    const styles = `
-        :root {
-            --seur-primary-color: #0066cc;
-            --seur-secondary-color: #004499;
-            --seur-success-color: #28a745;
-            --seur-warning-color: #ffc107;
-            --seur-danger-color: #dc3545;
-            --seur-light-color: #f8f9fa;
-            --seur-dark-color: #343a40;
-            --seur-border-radius: 12px;
-            --seur-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-            --seur-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .seur-shipping-widget {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 320px;
-            max-width: calc(100vw - 40px);
-            background: white;
-            border-radius: var(--seur-border-radius);
-            box-shadow: var(--seur-shadow);
-            z-index: 9999;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            overflow: hidden;
-            transition: var(--seur-transition);
-            transform: translateY(0);
-        }
-
-        .seur-shipping-widget:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        .seur-widget-header {
-            background: linear-gradient(135deg, var(--seur-primary-color), var(--seur-secondary-color));
-            color: white;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .seur-widget-header:hover {
-            background: linear-gradient(135deg, var(--seur-secondary-color), var(--seur-primary-color));
-        }
-
-        .seur-widget-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .seur-widget-icon {
-            font-size: 18px;
-            animation: seur-bounce 2s infinite;
-        }
-
-        @keyframes seur-bounce {
-            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-            40% { transform: translateY(-3px); }
-            60% { transform: translateY(-2px); }
-        }
-
-        .seur-widget-toggle {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: var(--seur-transition);
-            font-size: 12px;
-        }
-
-        .seur-widget-toggle:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: rotate(180deg);
-        }
-
-        .seur-widget-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-in-out;
-        }
-
-        .seur-widget-content.expanded {
-            max-height: 500px;
-        }
-
-        .seur-widget-body {
-            padding: 20px;
-        }
-
-        .seur-widget-loading {
-            text-align: center;
-            padding: 20px;
-            color: var(--seur-dark-color);
-        }
-
-        .seur-widget-loading .seur-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--seur-light-color);
-            border-top: 2px solid var(--seur-primary-color);
-            border-radius: 50%;
-            animation: seur-spin 1s linear infinite;
-            margin-bottom: 12px;
-        }
-
-        @keyframes seur-spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .seur-widget-loading .seur-loading-text {
-            font-size: 13px;
-            color: var(--seur-dark-color);
-        }
-
-        .seur-shipping-info {
-            margin-bottom: 16px;
-        }
-
-        .seur-shipping-cost {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            padding: 12px;
-            background: var(--seur-light-color);
-            border-radius: 8px;
-            border-left: 4px solid var(--seur-primary-color);
-        }
-
-        .seur-shipping-cost.free {
-            border-left-color: var(--seur-success-color);
-            background: #d4edda;
-        }
-
-        .seur-cost-label {
-            font-size: 13px;
-            color: var(--seur-dark-color);
-            font-weight: 500;
-        }
-
-        .seur-cost-value {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--seur-primary-color);
-        }
-
-        .seur-cost-value.free {
-            color: var(--seur-success-color);
-        }
-
-        .seur-cost-value.paid {
-            color: var(--seur-danger-color);
-        }
-
-        .seur-free-shipping-message {
-            background: linear-gradient(135deg, var(--seur-success-color), #20c997);
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            animation: seur-pulse 2s infinite;
-        }
-
-        @keyframes seur-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
-        }
-
-        .seur-free-shipping-icon {
-            margin-right: 6px;
-            font-size: 14px;
-        }
-
-        .seur-motivational-message {
-            background: var(--seur-warning-color);
-            color: var(--seur-dark-color);
-            padding: 10px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            text-align: center;
-            margin-bottom: 12px;
-            border-left: 3px solid #e0a800;
-        }
-
-        .seur-remaining-amount {
-            font-weight: 700;
-            color: var(--seur-primary-color);
-        }
-
-        .seur-shipping-details {
-            background: var(--seur-light-color);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 16px;
-        }
-
-        .seur-detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 6px;
-            font-size: 12px;
-        }
-
-        .seur-detail-row:last-child {
-            margin-bottom: 0;
-        }
-
-        .seur-detail-label {
-            color: var(--seur-dark-color);
-            font-weight: 500;
-        }
-
-        .seur-detail-value {
-            color: var(--seur-primary-color);
-            font-weight: 600;
-        }
-
-        .seur-cart-items {
-            margin-bottom: 16px;
-        }
-
-        .seur-cart-item {
-            display: flex;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .seur-cart-item:last-child {
-            border-bottom: none;
-        }
-
-        .seur-item-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--seur-primary-color);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-
-        .seur-item-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .seur-item-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--seur-dark-color);
-            margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .seur-item-info {
-            font-size: 11px;
-            color: #6c757d;
-            display: flex;
-            gap: 8px;
-        }
-
-        .seur-item-quantity {
-            background: var(--seur-primary-color);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 10px;
-            font-weight: 600;
-        }
-
-        .seur-widget-error {
-            background: var(--seur-danger-color);
-            color: white;
-            padding: 16px;
-            text-align: center;
-            border-radius: 8px;
-            margin: 16px 0;
-        }
-
-        .seur-error-icon {
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-
-        .seur-error-message {
-            font-size: 13px;
-            line-height: 1.4;
-        }
-
-        .seur-recalculate-btn {
-            width: 100%;
-            background: var(--seur-primary-color);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--seur-transition);
-            margin-top: 8px;
-        }
-
-        .seur-recalculate-btn:hover {
-            background: var(--seur-secondary-color);
-            transform: translateY(-1px);
-        }
-
-        .seur-recalculate-btn:active {
-            transform: translateY(0);
-        }
-
-        .seur-widget-footer {
-            background: var(--seur-light-color);
-            padding: 12px 20px;
-            text-align: center;
-            border-top: 1px solid #e9ecef;
-        }
-
-        .seur-footer-text {
-            font-size: 11px;
-            color: #6c757d;
-        }
-
-        .seur-footer-logo {
-            color: var(--seur-primary-color);
-            font-weight: 600;
-        }
-
-        .seur-widget.minimized .seur-widget-content {
-            max-height: 0;
-        }
-
-        .seur-widget.minimized .seur-widget-toggle {
-            transform: rotate(0deg);
-        }
-
-        .seur-widget-enter {
-            animation: seur-slideIn 0.3s ease-out;
-        }
-
-        @keyframes seur-slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        .seur-success-animation {
-            animation: seur-successPulse 0.6s ease-out;
-        }
-
-        @keyframes seur-successPulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        @media (max-width: 768px) {
-            .seur-shipping-widget {
-                bottom: 10px;
-                right: 10px;
-                left: 10px;
-                width: auto;
-                max-width: none;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .seur-shipping-widget {
-                bottom: 5px;
-                right: 5px;
-                left: 5px;
-            }
-        }
-    `;
-    
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = styles;
-    document.head.appendChild(styleSheet);
-}
-
-// ==============================================================================
-// INICIALIZACIÓN AUTOMÁTICA
+// INICIALIZACIÓN AUTOMÁTICA (CORREGIDA)
 // ==============================================================================
 
 function initializeSeurIntegration() {
     try {
-        // Inyectar estilos
+        console.log('[SEUR] Iniciando integración...');
+
+        // Inyectar estilos primero
         injectSeurStyles();
-        
-        // Crear widget
-        const widget = new SeurShippingWidget();
-        
-        // Guardar referencia global
-        window.seurWidget = widget;
-        
-        console.log('[SEUR] Integración inicializada correctamente');
-        
-        return widget;
+
+        // Esperar un poco para que el DOM esté completamente listo
+        setTimeout(() => {
+            // Crear widget
+            const widget = new SeurShippingWidget();
+
+            // Guardar referencia global
+            window.seurWidget = widget;
+
+            console.log('[SEUR] Integración inicializada correctamente');
+
+            // Mostrar notificación de éxito
+            if (window.SEUR_CONFIG.debug) {
+                console.log('[SEUR] Widget creado:', widget);
+                console.log('[SEUR] Configuración:', window.SEUR_CONFIG);
+            }
+
+        }, 1000);
+
+        return true;
     } catch (error) {
         console.error('[SEUR] Error inicializando integración:', error);
+        return false;
     }
 }
 
 // Inicializar cuando el DOM esté listo
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeSeurIntegration);
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('[SEUR] DOM cargado, inicializando...');
+        initializeSeurIntegration();
+    });
 } else {
+    console.log('[SEUR] DOM ya listo, inicializando...');
     initializeSeurIntegration();
 }
 
 // Función global para acceso manual
 window.initializeSeurShipping = initializeSeurIntegration;
+
+// Verificar que se cargó correctamente
+console.log('[SEUR] Script cargado correctamente');
+console.log('[SEUR] Función disponible: window.initializeSeurShipping()');
